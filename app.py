@@ -1,45 +1,31 @@
-# app.py (Final version: Voice on local, silent on cloud, radio fix)
 import streamlit as st
-import platform
-from questions import bdi_questions
+from questions import bdi_questions  # Import questions list
 
-# Smart voice speak (only on local Windows)
-if platform.system() == "Windows":
-    from pyttsx3 import init
-    def speak(text):
-        engine = init()
-        engine.say(text)
-        engine.runAndWait()
-else:
-    def speak(text):
-        pass  # Disabled on cloud
-
-# Page config
+# Streamlit page settings
 st.set_page_config(page_title="Mental Health Chatbot", page_icon="🧠")
 st.title("🧠 AI Mental Health Chatbot")
-st.write("This chatbot will help assess your mental health using the BDI-II scale. Please answer the questions honestly.")
+st.write("This chatbot helps assess your mental health using the BDI-II scale. Please answer all questions honestly.")
 
-# Score and response tracking
-score = 0
-responses = []
+# Initialize response list
+responses = [None] * len(bdi_questions)
 
-# Questions loop
+# Render questions with no default selection
 for idx, q in enumerate(bdi_questions):
-    st.subheader(q['question'])
-    response = st.radio("Choose one:", options=q['options'], key=idx, index=None)  # index=None fixes auto-select
-    if response:
-        responses.append(response)
-        score += q['options'].index(response)
-    else:
-        responses.append(None)
+    st.subheader(q["question"])
+    responses[idx] = st.radio("Choose one:", q["options"], key=idx, index=None)
 
-# On Submit
+# Submit button
 if st.button("Submit"):
     if None in responses:
-        st.warning("⚠️ Please answer all questions before submitting.")
+        st.error("❌ Please answer all questions before submitting.")
     else:
+        score = 0
+        for i, response in enumerate(responses):
+            score += bdi_questions[i]["options"].index(response)
+
         st.subheader(f"✅ Your BDI Score: {score}")
 
+        # Score-based feedback
         if score <= 13:
             feedback = "Minimal depression. You're doing well! Keep a healthy routine, stay connected, and continue doing what you enjoy. 🌱"
         elif 14 <= score <= 19:
@@ -51,4 +37,5 @@ if st.button("Submit"):
 
         st.write("### 💬 Feedback:")
         st.success(feedback)
-        speak(feedback)
+
+        # Text-to-speech removed for compatibility with Streamlit Cloud
