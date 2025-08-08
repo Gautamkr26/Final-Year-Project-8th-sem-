@@ -2,7 +2,4 @@ streamlit
 reportlab
 pandas
 numpy
-gTTS
 openpyxl
-pyttsx3
-
