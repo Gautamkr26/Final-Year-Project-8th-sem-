@@ -1,4 +1,4 @@
-# app.py — Final Structured Version
+# app.py — Final Mobile-Friendly Version
 import re
 import io
 import streamlit as st
@@ -19,14 +19,11 @@ st.set_page_config(page_title="Mental Health Chatbot (BDI-II)", page_icon="🧠"
 
 # ---------------------- HELPERS ----------------------
 def strip_leading_number(s: str) -> str:
-    """Remove any numbering at start (1., 1.1, etc.)."""
     return re.sub(r'^\s*\d+(?:\.\d+)?[\.\)\-]?\s*', '', s).strip() if isinstance(s, str) else s
 
 def build_pdf(patient_name, patient_age, assessment_date, score, severity_band, prescription):
-    """Generate a professional PDF report."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=inch, leftMargin=inch, topMargin=inch, bottomMargin=inch)
-
     styles = getSampleStyleSheet()
     title = ParagraphStyle("Title", parent=styles["Heading1"], alignment=TA_CENTER, fontSize=18, leading=22)
     small = ParagraphStyle("Small", parent=styles["BodyText"], fontSize=10, leading=12)
@@ -60,7 +57,6 @@ def build_pdf(patient_name, patient_age, assessment_date, score, severity_band, 
     return buffer
 
 def speak_browser_once(text: str):
-    """Browser-based TTS (works on mobile & Cloud)."""
     if not text or st.session_state.get("_last_spoken") == text:
         return
     st.session_state["_last_spoken"] = text
@@ -118,7 +114,6 @@ if not st.session_state.details_done:
 # ---------------------- ASSESSMENT ----------------------
 assessment = MentalHealthAssessment(bdi_questions)
 total_q = len(bdi_questions)
-
 answered = sum(1 for r in st.session_state.responses if r is not None)
 st.progress(answered / total_q)
 st.markdown(f"**Progress:** {answered}/{total_q}")
@@ -152,7 +147,6 @@ elif not st.session_state.submitted:
     i = st.session_state.step_index
     q = bdi_questions[i]
     clean_q = strip_leading_number(q["question"])
-
     st.markdown(f"**{i+1}. {clean_q}**")
     opts = [strip_leading_number(o) for o in q["options"]]
     default = st.session_state.responses[i] if st.session_state.responses[i] is not None else None
@@ -160,36 +154,30 @@ elif not st.session_state.submitted:
                         format_func=lambda j, _opts=opts: _opts[j], key=f"q_step_{i}")
     if selected is not None:
         st.session_state.responses[i] = int(selected)
-
     if enable_tts:
         speak_browser_once(clean_q)
 
-    # ---- MOBILE-FRIENDLY BUTTON ROW ----
+    # ---- MOBILE-FRIENDLY BUTTONS ----
     st.markdown("""
     <style>
-    .button-row button { width: 100%; }
-    .button-row { display: flex; gap: 10px; }
-    .button-row > div { flex: 1; }
+    .button-row { display: flex; justify-content: space-between; gap: 8px; }
+    .button-row button { flex: 1; }
     </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="button-row">', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("⬅️ Back", disabled=(i == 0)):
-            st.session_state.step_index = max(0, i - 1)
-            st.rerun()
-    with col2:
-        if st.button("➡️ Next", disabled=(st.session_state.responses[i] is None or i == total_q - 1)):
-            st.session_state.step_index = min(total_q - 1, i + 1)
-            st.rerun()
-    with col3:
-        if st.button("🔍 Submit", disabled=any(r is None for r in st.session_state.responses)):
-            st.session_state.score = sum(st.session_state.responses)
-            st.session_state.severity = score_to_severity(st.session_state.score)
-            st.session_state.submitted = True
-            if enable_tts:
-                speak_browser_once(severity_message(st.session_state.severity))
+    if st.button("⬅️ Back", disabled=(i == 0)):
+        st.session_state.step_index = max(0, i - 1)
+        st.rerun()
+    if st.button("➡️ Next", disabled=(st.session_state.responses[i] is None or i == total_q - 1)):
+        st.session_state.step_index = min(total_q - 1, i + 1)
+        st.rerun()
+    if st.button("🔍 Submit", disabled=any(r is None for r in st.session_state.responses)):
+        st.session_state.score = sum(st.session_state.responses)
+        st.session_state.severity = score_to_severity(st.session_state.score)
+        st.session_state.submitted = True
+        if enable_tts:
+            speak_browser_once(severity_message(st.session_state.severity))
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------------- RESULTS ----------------------
