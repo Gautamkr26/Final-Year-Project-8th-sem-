@@ -1,1 +1,7 @@
+streamlit
+reportlab
+pandas
+numpy
+gTTS
+openpyxl
 
