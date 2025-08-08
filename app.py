@@ -1,4 +1,4 @@
-# app.py — Final Hybrid TTS (Mobile Button + Desktop Auto)
+# app.py — Final Hybrid TTS (Desktop Auto + Mobile Button)
 import re
 import io
 import streamlit as st
@@ -9,7 +9,6 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
-
 from questions import bdi_questions
 from assessment import MentalHealthAssessment
 from utils import score_to_severity, severity_message, crisis_message, Severity
@@ -41,48 +40,41 @@ def build_pdf(patient_name, patient_age, assessment_date, score, severity_band, 
         Paragraph("<b>Doctor's Prescription / Advice:</b>", small),
         Spacer(1, 6)
     ]
-
     for p in [line.strip() for line in prescription.split("\n") if line.strip()]:
         elems.append(Paragraph(p, normal))
         elems.append(Spacer(1, 6))
-
     elems.append(Spacer(1, 20))
     elems.append(Paragraph(
         "This report is for informational purposes only and does not replace a professional diagnosis.",
         ParagraphStyle("Footer", fontSize=9, leading=11, alignment=TA_JUSTIFY)
     ))
-
     doc.build(elems)
     buffer.seek(0)
     return buffer
 
-def is_mobile():
-    """Detect if user is on mobile using JS injection."""
-    detect_html = """
-    <script>
-    const mobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
-    window.parent.postMessage({isMobile: mobile}, "*");
-    </script>
-    """
-    components.html(detect_html, height=0)
-    return st.session_state.get("is_mobile", False)
+def detect_mobile():
+    """Detect if device is mobile."""
+    ua = st.session_state.get("user_agent", "")
+    return re.search(r"Android|iPhone|iPad|iPod|Opera Mini|IEMobile", ua, re.I) is not None
 
-def tts_desktop(text: str):
-    """Auto TTS for desktop"""
+def tts_auto_desktop(text: str):
+    """Auto TTS with delay for desktop."""
     if not text:
         return
     escaped = text.replace('"', '\\"').replace("\n", "\\n")
     components.html(f"""
     <script>
-    var u = new SpeechSynthesisUtterance("{escaped}");
-    u.lang = 'en-US';
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    setTimeout(function(){{
+        var u = new SpeechSynthesisUtterance("{escaped}");
+        u.lang = 'en-US';
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+    }}, 500);
     </script>
     """, height=0)
 
-def tts_mobile_button(text: str):
-    """Show Streamlit button for mobile TTS"""
+def tts_button_mobile(text: str):
+    """TTS button for mobile."""
     if st.button("🔊 Read Aloud", use_container_width=True):
         escaped = text.replace('"', '\\"').replace("\n", "\\n")
         components.html(f"""
@@ -105,7 +97,7 @@ if "patient_name" not in st.session_state:
         "step_index": 0,
         "responses": [None] * len(bdi_questions),
         "submitted": False,
-        "is_mobile": False
+        "user_agent": st.request.headers.get("User-Agent", "") if hasattr(st, "request") else ""
     })
 
 # ---------------- SIDEBAR ----------------
@@ -126,7 +118,6 @@ if not st.session_state.details_done:
     st.session_state.assessment_date = st.date_input(
         "Assessment Date", datetime.strptime(st.session_state.assessment_date, "%Y-%m-%d")
     ).strftime("%Y-%m-%d")
-
     if st.button("➡️ Next to Assessment"):
         if not st.session_state.patient_name.strip() or not st.session_state.patient_age.strip():
             st.warning("Please enter both Name and Age.")
@@ -154,7 +145,6 @@ if not st.session_state.submitted and st.session_state.mode == "All at once":
                             format_func=lambda i, _opts=opts: _opts[i], key=f"q_all_{idx}")
         if selected is not None:
             st.session_state.responses[idx] = int(selected)
-
     if st.button("🔍 Submit Assessment"):
         if None in st.session_state.responses:
             st.warning("Please answer all questions.")
@@ -179,11 +169,10 @@ elif not st.session_state.submitted:
 
     # TTS Hybrid Logic
     if st.session_state.enable_tts:
-        user_agent = st.user_agent if hasattr(st, "user_agent") else ""
-        if re.search(r"Android|iPhone|iPad|iPod|Opera Mini|IEMobile", user_agent, re.I):
-            tts_mobile_button(clean_q)
+        if detect_mobile():
+            tts_button_mobile(clean_q)
         else:
-            tts_desktop(clean_q)
+            tts_auto_desktop(clean_q)
 
     # ---- BUTTON ROW ----
     col1, col2, col3 = st.columns(3)
@@ -208,27 +197,22 @@ if st.session_state.submitted:
     score = st.session_state.score
     severity = st.session_state.severity
     band = severity.name.capitalize()
-
     st.success(f"✅ Your Score: {score}/63")
     st.info(severity_message(severity))
     if severity in (Severity.MODERATE, Severity.SEVERE):
         st.error(crisis_message())
-
     pdf_data = build_pdf(
         st.session_state.patient_name, st.session_state.patient_age, st.session_state.assessment_date,
         score, band, severity_message(severity)
     )
-
     st.download_button("📄 Download PDF Report", data=pdf_data,
                        file_name=f"BDI_Report_{st.session_state.patient_name.replace(' ', '_')}.pdf",
                        mime="application/pdf")
-
     if st.button("🧪 Take Again"):
         st.session_state.responses = [None] * total_q
         st.session_state.submitted = False
         st.session_state.step_index = 0
         st.rerun()
-
     if st.button("🏠 Start Over"):
         for k in list(st.session_state.keys()):
             del st.session_state[k]
