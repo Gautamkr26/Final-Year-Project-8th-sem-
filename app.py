@@ -1,4 +1,4 @@
-# app.py — Final Mobile Friendly & Working TTS
+# app.py — Final with Mobile+Laptop TTS Fix
 import re
 import io
 import streamlit as st
@@ -56,18 +56,32 @@ def build_pdf(patient_name, patient_age, assessment_date, score, severity_band, 
     buffer.seek(0)
     return buffer
 
-def speak_browser_once(text: str):
+def add_tts_button(text: str):
+    """Add a manual 'Read Aloud' button that works on mobile + laptop"""
     if not text:
         return
     escaped = text.replace('"', '\\"').replace("\n", "\\n")
     components.html(f"""
+    <button id="ttsBtn" style="
+        padding:8px 16px;
+        background-color:#4CAF50;
+        color:white;
+        border:none;
+        border-radius:5px;
+        cursor:pointer;
+        font-size:14px;
+        margin-bottom:10px;
+    ">🔊 Read Aloud</button>
     <script>
-    var u = new SpeechSynthesisUtterance("{escaped}");
-    u.lang = 'en-US';
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    const btn = document.getElementById("ttsBtn");
+    btn.addEventListener("click", function() {{
+        var u = new SpeechSynthesisUtterance("{escaped}");
+        u.lang = 'en-US';
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+    }});
     </script>
-    """, height=0)
+    """, height=50)
 
 # ---------------------- STATE INIT ----------------------
 if "patient_name" not in st.session_state:
@@ -151,10 +165,9 @@ elif not st.session_state.submitted:
     if selected is not None:
         st.session_state.responses[i] = int(selected)
 
-    # TTS button for mobile
+    # TTS button for mobile+laptop
     if st.session_state.enable_tts:
-        if st.button("🔊 Read Question"):
-            speak_browser_once(clean_q)
+        add_tts_button(clean_q)
 
     # ---- RESPONSIVE BUTTON ROW ----
     col1, col2, col3 = st.columns(3)
