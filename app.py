@@ -1,4 +1,4 @@
-# app.py — Final Hybrid TTS (Desktop Auto + Mobile Button)
+# app.py — Final Auto TTS Only (No Button)
 import re
 import io
 import streamlit as st
@@ -9,6 +9,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
+
 from questions import bdi_questions
 from assessment import MentalHealthAssessment
 from utils import score_to_severity, severity_message, crisis_message, Severity
@@ -52,13 +53,8 @@ def build_pdf(patient_name, patient_age, assessment_date, score, severity_band, 
     buffer.seek(0)
     return buffer
 
-def detect_mobile():
-    """Detect if device is mobile."""
-    ua = st.session_state.get("user_agent", "")
-    return re.search(r"Android|iPhone|iPad|iPod|Opera Mini|IEMobile", ua, re.I) is not None
-
-def tts_auto_desktop(text: str):
-    """Auto TTS with delay for desktop."""
+def tts_auto(text: str):
+    """Auto TTS for any device"""
     if not text:
         return
     escaped = text.replace('"', '\\"').replace("\n", "\\n")
@@ -69,22 +65,9 @@ def tts_auto_desktop(text: str):
         u.lang = 'en-US';
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(u);
-    }}, 500);
+    }}, 400);
     </script>
     """, height=0)
-
-def tts_button_mobile(text: str):
-    """TTS button for mobile."""
-    if st.button("🔊 Read Aloud", use_container_width=True):
-        escaped = text.replace('"', '\\"').replace("\n", "\\n")
-        components.html(f"""
-        <script>
-        var u = new SpeechSynthesisUtterance("{escaped}");
-        u.lang = 'en-US';
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(u);
-        </script>
-        """, height=0)
 
 # ---------------- STATE INIT ----------------
 if "patient_name" not in st.session_state:
@@ -96,8 +79,7 @@ if "patient_name" not in st.session_state:
         "mode": "Step-by-step",
         "step_index": 0,
         "responses": [None] * len(bdi_questions),
-        "submitted": False,
-        "user_agent": st.request.headers.get("User-Agent", "") if hasattr(st, "request") else ""
+        "submitted": False
     })
 
 # ---------------- SIDEBAR ----------------
@@ -167,12 +149,9 @@ elif not st.session_state.submitted:
     if selected is not None:
         st.session_state.responses[i] = int(selected)
 
-    # TTS Hybrid Logic
+    # Auto TTS (if enabled)
     if st.session_state.enable_tts:
-        if detect_mobile():
-            tts_button_mobile(clean_q)
-        else:
-            tts_auto_desktop(clean_q)
+        tts_auto(clean_q)
 
     # ---- BUTTON ROW ----
     col1, col2, col3 = st.columns(3)
