@@ -1,4 +1,4 @@
-# app.py — Final with Mobile+Laptop TTS Fix
+# app.py — Hybrid TTS (Auto on Laptop, Button on Mobile)
 import re
 import io
 import streamlit as st
@@ -56,32 +56,44 @@ def build_pdf(patient_name, patient_age, assessment_date, score, severity_band, 
     buffer.seek(0)
     return buffer
 
-def add_tts_button(text: str):
-    """Add a manual 'Read Aloud' button that works on mobile + laptop"""
+def tts_hybrid(text: str):
+    """Auto TTS for desktop, Button for mobile"""
     if not text:
         return
     escaped = text.replace('"', '\\"').replace("\n", "\\n")
     components.html(f"""
-    <button id="ttsBtn" style="
-        padding:8px 16px;
-        background-color:#4CAF50;
-        color:white;
-        border:none;
-        border-radius:5px;
-        cursor:pointer;
-        font-size:14px;
-        margin-bottom:10px;
-    ">🔊 Read Aloud</button>
     <script>
-    const btn = document.getElementById("ttsBtn");
-    btn.addEventListener("click", function() {{
+    function isMobile() {{
+        return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+    }}
+    if (isMobile()) {{
+        // Show button for mobile
+        const btn = document.createElement("button");
+        btn.innerHTML = "🔊 Read Aloud";
+        btn.style.padding = "8px 16px";
+        btn.style.backgroundColor = "#4CAF50";
+        btn.style.color = "white";
+        btn.style.border = "none";
+        btn.style.borderRadius = "5px";
+        btn.style.cursor = "pointer";
+        btn.style.fontSize = "14px";
+        btn.style.marginBottom = "10px";
+        document.body.appendChild(btn);
+        btn.addEventListener("click", function() {{
+            var u = new SpeechSynthesisUtterance("{escaped}");
+            u.lang = 'en-US';
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(u);
+        }});
+    }} else {{
+        // Auto play for desktop
         var u = new SpeechSynthesisUtterance("{escaped}");
         u.lang = 'en-US';
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(u);
-    }});
+    }}
     </script>
-    """, height=50)
+    """, height=60)
 
 # ---------------------- STATE INIT ----------------------
 if "patient_name" not in st.session_state:
@@ -165,9 +177,9 @@ elif not st.session_state.submitted:
     if selected is not None:
         st.session_state.responses[i] = int(selected)
 
-    # TTS button for mobile+laptop
+    # TTS Hybrid
     if st.session_state.enable_tts:
-        add_tts_button(clean_q)
+        tts_hybrid(clean_q)
 
     # ---- RESPONSIVE BUTTON ROW ----
     col1, col2, col3 = st.columns(3)
