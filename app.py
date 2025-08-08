@@ -3,7 +3,7 @@ from questions import bdi_questions  # Import questions list
 
 # Streamlit page settings
 st.set_page_config(page_title="Mental Health Chatbot", page_icon="🧠")
-st.title("🧠 AI Mental Health Chatbot")
+st.title("🧠 AI based Mental Health Chatbot")
 st.write("This chatbot helps assess your mental health using the BDI-II scale. Please answer all questions honestly.")
 
 # Initialize response list
@@ -39,3 +39,4 @@ if st.button("Submit"):
         st.success(feedback)
 
         # Text-to-speech removed for compatibility with Streamlit Cloud
+
