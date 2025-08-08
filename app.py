@@ -1,4 +1,4 @@
-# app.py — Hybrid TTS (Auto on Laptop, Button on Mobile)
+# app.py — Final Hybrid TTS (Mobile Button + Desktop Auto)
 import re
 import io
 import streamlit as st
@@ -14,10 +14,10 @@ from questions import bdi_questions
 from assessment import MentalHealthAssessment
 from utils import score_to_severity, severity_message, crisis_message, Severity
 
-# ---------------------- CONFIG ----------------------
+# ---------------- CONFIG ----------------
 st.set_page_config(page_title="Mental Health Chatbot (BDI-II)", page_icon="🧠", layout="centered")
 
-# ---------------------- HELPERS ----------------------
+# ---------------- HELPERS ----------------
 def strip_leading_number(s: str) -> str:
     return re.sub(r'^\s*\d+(?:\.\d+)?[\.\)\-]?\s*', '', s).strip() if isinstance(s, str) else s
 
@@ -56,46 +56,45 @@ def build_pdf(patient_name, patient_age, assessment_date, score, severity_band, 
     buffer.seek(0)
     return buffer
 
-def tts_hybrid(text: str):
-    """Auto TTS for desktop, Button for mobile"""
+def is_mobile():
+    """Detect if user is on mobile using JS injection."""
+    detect_html = """
+    <script>
+    const mobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+    window.parent.postMessage({isMobile: mobile}, "*");
+    </script>
+    """
+    components.html(detect_html, height=0)
+    return st.session_state.get("is_mobile", False)
+
+def tts_desktop(text: str):
+    """Auto TTS for desktop"""
     if not text:
         return
     escaped = text.replace('"', '\\"').replace("\n", "\\n")
     components.html(f"""
     <script>
-    function isMobile() {{
-        return /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
-    }}
-    if (isMobile()) {{
-        // Show button for mobile
-        const btn = document.createElement("button");
-        btn.innerHTML = "🔊 Read Aloud";
-        btn.style.padding = "8px 16px";
-        btn.style.backgroundColor = "#4CAF50";
-        btn.style.color = "white";
-        btn.style.border = "none";
-        btn.style.borderRadius = "5px";
-        btn.style.cursor = "pointer";
-        btn.style.fontSize = "14px";
-        btn.style.marginBottom = "10px";
-        document.body.appendChild(btn);
-        btn.addEventListener("click", function() {{
-            var u = new SpeechSynthesisUtterance("{escaped}");
-            u.lang = 'en-US';
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.speak(u);
-        }});
-    }} else {{
-        // Auto play for desktop
+    var u = new SpeechSynthesisUtterance("{escaped}");
+    u.lang = 'en-US';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+    </script>
+    """, height=0)
+
+def tts_mobile_button(text: str):
+    """Show Streamlit button for mobile TTS"""
+    if st.button("🔊 Read Aloud", use_container_width=True):
+        escaped = text.replace('"', '\\"').replace("\n", "\\n")
+        components.html(f"""
+        <script>
         var u = new SpeechSynthesisUtterance("{escaped}");
         u.lang = 'en-US';
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(u);
-    }}
-    </script>
-    """, height=60)
+        </script>
+        """, height=0)
 
-# ---------------------- STATE INIT ----------------------
+# ---------------- STATE INIT ----------------
 if "patient_name" not in st.session_state:
     st.session_state.update({
         "patient_name": "",
@@ -105,20 +104,21 @@ if "patient_name" not in st.session_state:
         "mode": "Step-by-step",
         "step_index": 0,
         "responses": [None] * len(bdi_questions),
-        "submitted": False
+        "submitted": False,
+        "is_mobile": False
     })
 
-# ---------------------- SIDEBAR ----------------------
+# ---------------- SIDEBAR ----------------
 with st.sidebar:
     st.header("⚙️ Settings")
     st.session_state.mode = st.radio("Assessment mode", ["All at once", "Step-by-step"], index=1)
     st.session_state.enable_tts = st.checkbox("Enable voice (TTS - browser)", value=False)
     st.markdown("This is a self-assessment. For emergencies contact local services.")
 
-# ---------------------- TITLE ----------------------
+# ---------------- TITLE ----------------
 st.title("🧠 Mental Health Chatbot — BDI-II")
 
-# ---------------------- PATIENT DETAILS ----------------------
+# ---------------- PATIENT DETAILS ----------------
 if not st.session_state.details_done:
     st.subheader("🧾 Patient Information")
     st.session_state.patient_name = st.text_input("Full name", value=st.session_state.patient_name)
@@ -135,7 +135,7 @@ if not st.session_state.details_done:
             st.rerun()
     st.stop()
 
-# ---------------------- ASSESSMENT ----------------------
+# ---------------- ASSESSMENT ----------------
 assessment = MentalHealthAssessment(bdi_questions)
 total_q = len(bdi_questions)
 answered = sum(1 for r in st.session_state.responses if r is not None)
@@ -177,11 +177,15 @@ elif not st.session_state.submitted:
     if selected is not None:
         st.session_state.responses[i] = int(selected)
 
-    # TTS Hybrid
+    # TTS Hybrid Logic
     if st.session_state.enable_tts:
-        tts_hybrid(clean_q)
+        user_agent = st.user_agent if hasattr(st, "user_agent") else ""
+        if re.search(r"Android|iPhone|iPad|iPod|Opera Mini|IEMobile", user_agent, re.I):
+            tts_mobile_button(clean_q)
+        else:
+            tts_desktop(clean_q)
 
-    # ---- RESPONSIVE BUTTON ROW ----
+    # ---- BUTTON ROW ----
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("⬅️ Back", use_container_width=True, disabled=(i == 0)):
@@ -199,7 +203,7 @@ elif not st.session_state.submitted:
             st.session_state.severity = score_to_severity(st.session_state.score)
             st.session_state.submitted = True
 
-# ---------------------- RESULTS ----------------------
+# ---------------- RESULTS ----------------
 if st.session_state.submitted:
     score = st.session_state.score
     severity = st.session_state.severity
