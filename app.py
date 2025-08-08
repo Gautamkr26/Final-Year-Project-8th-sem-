@@ -157,7 +157,7 @@ if not st.session_state.submitted:
         i = st.session_state.step_index
         q = bdi_questions[i]
 
-        st.header("🧭 Step-by-step Assessment")
+        st.header("Step-by-step Assessment")
         clean_question = strip_leading_number(q.get("question", ""))
         st.markdown(f"**{i+1}. {clean_question}**")
 
@@ -256,3 +256,4 @@ if st.session_state.submitted:
     if st.button("🧪 Take again"):
         reset_assessment()
         st.rerun()
+
