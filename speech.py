@@ -1,23 +1,10 @@
-import platform
-import streamlit as st
+import pyttsx3
+import threading
 
 def speak(text):
-    if platform.system() == "Windows":
-        try:
-            from pyttsx3 import init
-            engine = init()
-            engine.say(text)
-            engine.runAndWait()
-        except:
-            pass
-    else:
-        # Streamlit browser voice using JavaScript
-        st.markdown(
-            f"""
-            <script>
-            var msg = new SpeechSynthesisUtterance("{text}");
-            window.speechSynthesis.speak(msg);
-            </script>
-            """,
-            unsafe_allow_html=True
-        )
+    engine = pyttsx3.init()
+    engine.say(text)
+    engine.runAndWait()
+
+def threaded_speak(text):
+    threading.Thread(target=speak, args=(text,), daemon=True).start()
