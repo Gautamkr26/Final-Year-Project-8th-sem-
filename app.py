@@ -1,4 +1,4 @@
-# app.py — Final Mobile-Friendly Version
+# app.py — Final Mobile Friendly & Working TTS
 import re
 import io
 import streamlit as st
@@ -57,9 +57,8 @@ def build_pdf(patient_name, patient_age, assessment_date, score, severity_band, 
     return buffer
 
 def speak_browser_once(text: str):
-    if not text or st.session_state.get("_last_spoken") == text:
+    if not text:
         return
-    st.session_state["_last_spoken"] = text
     escaped = text.replace('"', '\\"').replace("\n", "\\n")
     components.html(f"""
     <script>
@@ -80,15 +79,14 @@ if "patient_name" not in st.session_state:
         "mode": "Step-by-step",
         "step_index": 0,
         "responses": [None] * len(bdi_questions),
-        "submitted": False,
-        "_last_spoken": ""
+        "submitted": False
     })
 
 # ---------------------- SIDEBAR ----------------------
 with st.sidebar:
     st.header("⚙️ Settings")
     st.session_state.mode = st.radio("Assessment mode", ["All at once", "Step-by-step"], index=1)
-    enable_tts = st.checkbox("Enable voice (TTS - browser)", value=False)
+    st.session_state.enable_tts = st.checkbox("Enable voice (TTS - browser)", value=False)
     st.markdown("This is a self-assessment. For emergencies contact local services.")
 
 # ---------------------- TITLE ----------------------
@@ -138,8 +136,6 @@ if not st.session_state.submitted and st.session_state.mode == "All at once":
             st.session_state.score = sum(st.session_state.responses)
             st.session_state.severity = score_to_severity(st.session_state.score)
             st.session_state.submitted = True
-            if enable_tts:
-                speak_browser_once(severity_message(st.session_state.severity))
 
 # ---- STEP BY STEP MODE ----
 elif not st.session_state.submitted:
@@ -154,31 +150,29 @@ elif not st.session_state.submitted:
                         format_func=lambda j, _opts=opts: _opts[j], key=f"q_step_{i}")
     if selected is not None:
         st.session_state.responses[i] = int(selected)
-    if enable_tts:
-        speak_browser_once(clean_q)
 
-    # ---- MOBILE-FRIENDLY BUTTONS ----
-    st.markdown("""
-    <style>
-    .button-row { display: flex; justify-content: space-between; gap: 8px; }
-    .button-row button { flex: 1; }
-    </style>
-    """, unsafe_allow_html=True)
+    # TTS button for mobile
+    if st.session_state.enable_tts:
+        if st.button("🔊 Read Question"):
+            speak_browser_once(clean_q)
 
-    st.markdown('<div class="button-row">', unsafe_allow_html=True)
-    if st.button("⬅️ Back", disabled=(i == 0)):
-        st.session_state.step_index = max(0, i - 1)
-        st.rerun()
-    if st.button("➡️ Next", disabled=(st.session_state.responses[i] is None or i == total_q - 1)):
-        st.session_state.step_index = min(total_q - 1, i + 1)
-        st.rerun()
-    if st.button("🔍 Submit", disabled=any(r is None for r in st.session_state.responses)):
-        st.session_state.score = sum(st.session_state.responses)
-        st.session_state.severity = score_to_severity(st.session_state.score)
-        st.session_state.submitted = True
-        if enable_tts:
-            speak_browser_once(severity_message(st.session_state.severity))
-    st.markdown('</div>', unsafe_allow_html=True)
+    # ---- RESPONSIVE BUTTON ROW ----
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("⬅️ Back", use_container_width=True, disabled=(i == 0)):
+            st.session_state.step_index = max(0, i - 1)
+            st.rerun()
+    with col2:
+        if st.button("➡️ Next", use_container_width=True,
+                     disabled=(st.session_state.responses[i] is None or i == total_q - 1)):
+            st.session_state.step_index = min(total_q - 1, i + 1)
+            st.rerun()
+    with col3:
+        if st.button("🔍 Submit", use_container_width=True,
+                     disabled=any(r is None for r in st.session_state.responses)):
+            st.session_state.score = sum(st.session_state.responses)
+            st.session_state.severity = score_to_severity(st.session_state.score)
+            st.session_state.submitted = True
 
 # ---------------------- RESULTS ----------------------
 if st.session_state.submitted:
